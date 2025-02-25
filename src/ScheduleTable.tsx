@@ -15,15 +15,16 @@ import {
 import { CellSize, DAY_LABELS, 분 } from "./constants.ts";
 import { Schedule } from "./types.ts";
 import { fill2, parseHnM } from "./utils.ts";
-import { useDndContext, useDraggable } from "@dnd-kit/core";
+import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { ComponentProps, Fragment } from "react";
+import { ComponentProps, Fragment, memo, useMemo } from "react";
 import { useScheduleTableContext } from "./context/SchedulTable/hooks.ts";
 
 interface Props {
   tableId: string;
   onScheduleTimeClick?: (timeInfo: { day: string; time: number }) => void;
   onDeleteButtonClick?: (timeInfo: { day: string; time: number }) => void;
+  isActive?: boolean;
 }
 
 const TIMES = [
@@ -38,37 +39,54 @@ const TIMES = [
     .map((v) => `${parseHnM(v)}~${parseHnM(v + 50 * 분)}`),
 ] as const;
 
-const ScheduleTable = ({
-  tableId,
-  onScheduleTimeClick,
-  onDeleteButtonClick,
-}: Props) => {
-  const { schedules } = useScheduleTableContext();
+const ScheduleTable = memo(
+  ({ tableId, onScheduleTimeClick, onDeleteButtonClick, isActive }: Props) => {
+    const { schedules } = useScheduleTableContext();
 
-  const getColor = (lectureId: string): string => {
-    const lectures = [...new Set(schedules.map(({ lecture }) => lecture.id))];
-    const colors = ["#fdd", "#ffd", "#dff", "#ddf", "#fdf", "#dfd"];
-    return colors[lectures.indexOf(lectureId) % colors.length];
-  };
+    const getColor = (lectureId: string): string => {
+      const lectures = [...new Set(schedules.map(({ lecture }) => lecture.id))];
+      const colors = ["#fdd", "#ffd", "#dff", "#ddf", "#fdf", "#dfd"];
+      return colors[lectures.indexOf(lectureId) % colors.length];
+    };
 
-  const dndContext = useDndContext();
+    const deleteButton = useMemo(() => {
+      return schedules.map(
+        (schedule) => () =>
+          onDeleteButtonClick?.({
+            day: schedule.day,
+            time: schedule.range[0],
+          })
+      );
+    }, [onDeleteButtonClick, schedules]);
 
-  const getActiveTableId = () => {
-    const activeId = dndContext.active?.id;
-    if (activeId) {
-      return String(activeId).split(":")[0];
-    }
-    return null;
-  };
+    return (
+      <Box
+        position="relative"
+        outline={isActive ? "5px dashed" : undefined}
+        outlineColor="blue.300"
+      >
+        <ScheduleTableGrid onScheduleTimeClick={onScheduleTimeClick} />
+        {schedules.map((schedule, index) => (
+          <DraggableSchedule
+            key={`${schedule.lecture.title}-${index}`}
+            id={`${tableId}:${index}`}
+            data={schedule}
+            bg={getColor(schedule.lecture.id)}
+            onDeleteButtonClick={deleteButton[index]}
+          />
+        ))}
+      </Box>
+    );
+  }
+);
 
-  const activeTableId = getActiveTableId();
-
-  return (
-    <Box
-      position="relative"
-      outline={activeTableId === tableId ? "5px dashed" : undefined}
-      outlineColor="blue.300"
-    >
+const ScheduleTableGrid = memo(
+  ({
+    onScheduleTimeClick,
+  }: {
+    onScheduleTimeClick?: (timeInfo: { day: string; time: number }) => void;
+  }) => {
+    return (
       <Grid
         templateColumns={`120px repeat(${DAY_LABELS.length}, ${CellSize.WIDTH}px)`}
         templateRows={`40px repeat(${TIMES.length}, ${CellSize.HEIGHT}px)`}
@@ -78,6 +96,7 @@ const ScheduleTable = ({
         outline="1px solid"
         outlineColor="gray.300"
       >
+        {" "}
         <GridItem key="교시" borderColor="gray.300" bg="gray.100">
           <Flex justifyContent="center" alignItems="center" h="full" w="full">
             <Text fontWeight="bold">교시</Text>
@@ -124,24 +143,9 @@ const ScheduleTable = ({
           </Fragment>
         ))}
       </Grid>
-
-      {schedules.map((schedule, index) => (
-        <DraggableSchedule
-          key={`${schedule.lecture.title}-${index}`}
-          id={`${tableId}:${index}`}
-          data={schedule}
-          bg={getColor(schedule.lecture.id)}
-          onDeleteButtonClick={() =>
-            onDeleteButtonClick?.({
-              day: schedule.day,
-              time: schedule.range[0],
-            })
-          }
-        />
-      ))}
-    </Box>
-  );
-};
+    );
+  }
+);
 
 const DraggableSchedule = ({
   id,
