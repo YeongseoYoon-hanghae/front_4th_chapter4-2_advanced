@@ -2,8 +2,9 @@ import { Button, ButtonGroup, Flex, Heading, Stack } from "@chakra-ui/react";
 import ScheduleTable from "./ScheduleTable.tsx";
 import { useScheduleContext } from "./ScheduleContext.tsx";
 import SearchDialog from "./SearchDialog.tsx";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ScheduleTableContextProvider } from "./context/SchedulTable/provider.tsx";
+import { useDndContext } from "@dnd-kit/core";
 
 export const ScheduleTables = () => {
   const { schedulesMap, setSchedulesMap } = useScheduleContext();
@@ -13,26 +14,39 @@ export const ScheduleTables = () => {
     time?: number;
   } | null>(null);
 
+  const dndContext = useDndContext();
+  const activeTableId = useMemo(() => {
+    const activeId = dndContext.active?.id;
+    if (activeId) {
+      return String(activeId).split(":")[0];
+    }
+    return null;
+  }, [dndContext.active?.id]);
+
   const schedulesEntries = useMemo(
     () => Object.entries(schedulesMap),
     [schedulesMap]
   );
 
-  const disabledRemoveButton = Object.keys(schedulesMap).length === 1;
+  const disabledRemoveButton = useMemo(
+    () => Object.keys(schedulesMap).length === 1,
+    [schedulesMap]
+  );
 
-  const duplicate = (targetId: string) => {
+  const duplicate = useCallback((targetId: string) => {
     setSchedulesMap((prev) => ({
       ...prev,
       [`schedule-${Date.now()}`]: [...prev[targetId]],
     }));
-  };
+  }, []);
 
-  const remove = (targetId: string) => {
+  const remove = useCallback((targetId: string) => {
     setSchedulesMap((prev) => {
-      delete prev[targetId];
-      return { ...prev };
+      const newMap = { ...prev };
+      delete newMap[targetId];
+      return newMap;
     });
-  };
+  }, []);
 
   return (
     <>
@@ -70,6 +84,7 @@ export const ScheduleTables = () => {
               <ScheduleTable
                 key={`schedule-table-${index}`}
                 tableId={tableId}
+                isActive={activeTableId === tableId}
                 onScheduleTimeClick={(timeInfo) =>
                   setSearchInfo({ tableId, ...timeInfo })
                 }
