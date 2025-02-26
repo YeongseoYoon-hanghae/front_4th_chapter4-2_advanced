@@ -11,13 +11,14 @@ import {
   PopoverContent,
   PopoverTrigger,
   Text,
+  useDisclosure,
 } from "@chakra-ui/react";
 import { CellSize, DAY_LABELS, 분 } from "./constants.ts";
 import { Schedule } from "./types.ts";
 import { fill2, parseHnM } from "./utils.ts";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { ComponentProps, Fragment, memo, useMemo } from "react";
+import { ComponentProps, Fragment, memo, useCallback, useMemo } from "react";
 import { useScheduleTableContext } from "./context/SchedulTable/hooks.ts";
 
 interface Props {
@@ -147,6 +148,25 @@ const ScheduleTableGrid = memo(
   }
 );
 
+const DeleteSchedulePopover = ({
+  onDeleteButtonClick,
+}: {
+  onDeleteButtonClick: () => void;
+}) => {
+  return (
+    <PopoverContent onClick={(event) => event.stopPropagation()}>
+      <PopoverArrow />
+      <PopoverCloseButton />
+      <PopoverBody>
+        <Text>강의를 삭제하시겠습니까?</Text>
+        <Button colorScheme="red" size="xs" onClick={onDeleteButtonClick}>
+          삭제
+        </Button>
+      </PopoverBody>
+    </PopoverContent>
+  );
+};
+
 const DraggableSchedule = ({
   id,
   data,
@@ -157,12 +177,19 @@ const DraggableSchedule = ({
   }) => {
   const { day, range, room, lecture } = data;
   const { attributes, setNodeRef, listeners, transform } = useDraggable({ id });
+  const { isOpen, onOpen, onClose } = useDisclosure();
+
   const leftIndex = DAY_LABELS.indexOf(day as (typeof DAY_LABELS)[number]);
   const topIndex = range[0] - 1;
   const size = range.length;
 
+  const handleDeleteClick = useCallback(() => {
+    onDeleteButtonClick();
+    onClose();
+  }, [onDeleteButtonClick, onClose]);
+
   return (
-    <Popover>
+    <Popover isOpen={isOpen} onOpen={onOpen} onClose={onClose}>
       <PopoverTrigger>
         <Box
           position="absolute"
@@ -185,16 +212,9 @@ const DraggableSchedule = ({
           <Text fontSize="xs">{room}</Text>
         </Box>
       </PopoverTrigger>
-      <PopoverContent onClick={(event) => event.stopPropagation()}>
-        <PopoverArrow />
-        <PopoverCloseButton />
-        <PopoverBody>
-          <Text>강의를 삭제하시겠습니까?</Text>
-          <Button colorScheme="red" size="xs" onClick={onDeleteButtonClick}>
-            삭제
-          </Button>
-        </PopoverBody>
-      </PopoverContent>
+      {isOpen && (
+        <DeleteSchedulePopover onDeleteButtonClick={handleDeleteClick} />
+      )}
     </Popover>
   );
 };
